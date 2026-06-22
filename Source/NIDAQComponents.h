@@ -321,6 +321,8 @@ public:
 	void startTasks(bool startAnalogTask = true);
 	void clearTasks();
 	void clearAnalogTask();
+	void clearContinuousDOTasks();
+	void clearDigitalFiniteTask();
 	void requestShutdown();
 
 	void analogWrite(AudioBuffer<float>& buffer, int numSamples);
@@ -340,6 +342,7 @@ public:
 	OwnedArray<OutputChannel> 	dout;
 
 	NIDAQ::TaskHandle taskHandleAO = 0;
+	NIDAQ::TaskHandle taskHandleDOFinite = 0;
 	std::vector<NIDAQ::TaskHandle> taskHandlesDO;
 
 private:
@@ -388,6 +391,8 @@ private:
 	int writeCount = 0;
 
 	NIDAQ::float64 audioSampleRate = 0;
+
+	String getFirstSelectedDigitalLine() const;
 };
 
 #endif  // __NIDAQCOMPONENTS_H__
