@@ -195,6 +195,19 @@ private:
 	Array<SOURCE_TYPE> sourceTypes;
 };
 
+struct DeviceOutputInfo
+{
+	StringArray analogOutputs;
+	StringArray digitalOutputs;
+
+	String getSummary() const
+	{
+		const String ao = analogOutputs.isEmpty() ? "none" : analogOutputs.joinIntoString(", ");
+		const String doLines = digitalOutputs.isEmpty() ? "none" : digitalOutputs.joinIntoString(", ");
+		return "AO: " + ao + "; DO: " + doLines;
+	}
+};
+
 class NIDAQDevice
 {
 
@@ -251,11 +264,17 @@ public:
 
 	NIDAQDevice* getDeviceFromName(String deviceName);
 
+	const DeviceOutputInfo& getDeviceOutputInfo(const String& deviceName);
+	String getDeviceSelectLabel(const String& deviceName, const String& productName);
+
 	friend class NIDAQThread;
 
 private:
 
+	DeviceOutputInfo queryDeviceOutputInfo(const String& deviceName);
+
 	OwnedArray<NIDAQDevice> devices;
+	HashMap<String, DeviceOutputInfo> deviceOutputInfoCache;
 	int activeDeviceIndex;
 };
 

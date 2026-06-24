@@ -71,10 +71,67 @@ Error:
 	return error;
 }
 
+DeviceOutputInfo NIDAQmxDeviceManager::queryDeviceOutputInfo(const String& deviceName)
+{
+	DeviceOutputInfo info;
+
+	if (deviceName == "Simulated")
+	{
+		for (int i = 0; i < MAX_NUM_ANALOG_OUTPUTS; ++i)
+			info.analogOutputs.add("ao" + String(i));
+
+		for (int i = 0; i < DEFAULT_NUM_DIGITAL_OUTPUTS; ++i)
+			info.digitalOutputs.add("port0/line" + String(i));
+
+		return info;
+	}
+
+	char aoData[2048] = { 0 };
+	NIDAQ::DAQmxGetDevAOPhysicalChans(STR2CHR(deviceName), aoData, sizeof(aoData));
+
+	StringArray aoList;
+	aoList.addTokens(aoData, ", ", "\"");
+
+	for (const auto& chan : aoList)
+	{
+		if (chan.isNotEmpty())
+			info.analogOutputs.add(chan.fromLastOccurrenceOf("/", false, false));
+	}
+
+	char doData[2048] = { 0 };
+	NIDAQ::DAQmxGetDevDOLines(STR2CHR(deviceName), doData, sizeof(doData));
+
+	StringArray doList;
+	doList.addTokens(doData, ", ", "\"");
+
+	for (const auto& line : doList)
+	{
+		if (line.isNotEmpty())
+			info.digitalOutputs.add(line.fromFirstOccurrenceOf("/", false, false));
+	}
+
+	return info;
+}
+
+const DeviceOutputInfo& NIDAQmxDeviceManager::getDeviceOutputInfo(const String& deviceName)
+{
+	if (!deviceOutputInfoCache.contains(deviceName))
+		deviceOutputInfoCache.set(deviceName, queryDeviceOutputInfo(deviceName));
+
+	return deviceOutputInfoCache.getReference(deviceName);
+}
+
+String NIDAQmxDeviceManager::getDeviceSelectLabel(const String& deviceName, const String& productName)
+{
+	juce::ignoreUnused(deviceName);
+	return productName;
+}
+
 void NIDAQmxDeviceManager::scanForDevices()
 {
 
 	devices.clear();
+	deviceOutputInfoCache.clear();
 
 	char data[2048] = { 0 };
 	NIDAQ::DAQmxGetSysDevNames(data, sizeof(data));
@@ -96,11 +153,15 @@ void NIDAQmxDeviceManager::scanForDevices()
 			NIDAQ::DAQmxGetDevProductType(STR2CHR(deviceName), &pname[0], sizeof(pname));
 			devices.add(new NIDAQDevice(deviceName));
 			devices.getLast()->productName = String(&pname[0]);
+			deviceOutputInfoCache.set(deviceName, queryDeviceOutputInfo(deviceName));
 		}
 	}
 
 	if (!devices.size())
+	{
 		devices.add(new NIDAQDevice("Simulated")); //TODO: Make SimulatedClass derived from NIDAQDevice
+		deviceOutputInfoCache.set("Simulated", queryDeviceOutputInfo("Simulated"));
+	}
 
 }
 

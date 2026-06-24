@@ -89,6 +89,9 @@ public:
     int getDeviceIndex() { return deviceIndex; };
     String getDeviceName() { return mNIDAQ->device->getName(); };
 
+    const DeviceOutputInfo& getDeviceOutputInfo(const String& deviceName);
+    String getDeviceSelectLabel(int deviceIndex);
+
     /** Set the current device by name */
     void setDevice(String deviceName);
 

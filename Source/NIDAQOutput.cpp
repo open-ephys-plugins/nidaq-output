@@ -227,6 +227,20 @@ Array<NIDAQDevice*> NIDAQOutput::getDevices()
     return deviceList;
 }
 
+const DeviceOutputInfo& NIDAQOutput::getDeviceOutputInfo(const String& deviceName)
+{
+    return dm->getDeviceOutputInfo(deviceName);
+}
+
+String NIDAQOutput::getDeviceSelectLabel(int index)
+{
+    if (index < 0 || index >= dm->getNumAvailableDevices())
+        return {};
+
+    NIDAQDevice* device = dm->getDeviceAtIndex(index);
+    return dm->getDeviceSelectLabel(device->getName(), device->productName);
+}
+
 void NIDAQOutput::setDevice(String name)
 {
     for (int i = 0; i < dm->getNumAvailableDevices(); i++)

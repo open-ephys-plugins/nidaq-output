@@ -366,9 +366,10 @@ void NIDAQOutputEditor::draw()
     Array<NIDAQDevice*> devices = processor->getDevices();
 	for (int i = 0; i < devices.size(); i++)
 	{
-		deviceSelectBox->addItem(devices[i]->productName, i + 1);
+		deviceSelectBox->addItem(processor->getDeviceSelectLabel(i), i + 1);
 	}
     deviceSelectBox->setSelectedId(processor->getDeviceIndex() + 1, dontSendNotification);
+	deviceSelectBox->setTooltip(processor->getDeviceOutputInfo(processor->getDeviceName()).getSummary());
     addAndMakeVisible(deviceSelectBox.get());
 
 	if (processor->getDevices().size() == 1)	// disable device selection if only one device is available
@@ -448,7 +449,11 @@ void NIDAQOutputEditor::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
     if (comboBoxThatHasChanged == deviceSelectBox)
     {
         int deviceIndex = deviceSelectBox->getSelectedItemIndex();
-        processor->setDevice(processor->getDevices()[deviceIndex]->getName());
+        const String deviceName = processor->getDevices()[deviceIndex]->getName();
+        processor->setDevice(deviceName);
+		const DeviceOutputInfo& outputs = processor->getDeviceOutputInfo(deviceName);
+		deviceSelectBox->setTooltip(outputs.getSummary());
+		LOGC("Selected device ", deviceName, ": ", outputs.getSummary());
         CoreServices::updateSignalChain(this);
     }
     else if (comboBoxThatHasChanged == sampleRateSelectBox)
