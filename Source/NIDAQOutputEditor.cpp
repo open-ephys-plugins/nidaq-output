@@ -69,8 +69,8 @@ NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
     waveformView->setBounds(190, 52, 180, 80);
     waveformView->onPlayRequested = [this]()
     {
-        if (processor != nullptr)
-            processor->playCustomWaveform();
+        if (processor != nullptr && waveformView != nullptr)
+            processor->playWaveformSamples(waveformView->getSamples());
     };
     addAndMakeVisible(waveformView.get());
 

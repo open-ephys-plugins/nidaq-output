@@ -181,6 +181,9 @@ public:
     /** Play the current custom waveform (manual trigger) */
     void playCustomWaveform();
 
+    /** Play arbitrary samples on the analog output (manual trigger) */
+    void playWaveformSamples(const Array<float>& samples);
+
 private:
     /* Manages connected NIDAQ devices */
     ScopedPointer<NIDAQmxDeviceManager> dm;

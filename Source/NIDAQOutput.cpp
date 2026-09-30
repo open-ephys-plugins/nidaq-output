@@ -224,6 +224,23 @@ void NIDAQOutput::playCustomWaveform()
     }
 }
 
+void NIDAQOutput::playWaveformSamples(const Array<float>& samples)
+{
+    if (samples.isEmpty() || mNIDAQ == nullptr)
+    {
+        LOGE("Cannot play waveform: no samples or device unavailable");
+        outputEnabled = false;
+        return;
+    }
+
+    AudioBuffer<float> buffer(1, samples.size());
+    for (int i = 0; i < samples.size(); ++i)
+        buffer.setSample(0, i, samples[i]);
+
+    outputEnabled = true;
+    mNIDAQ->writeAnalogWaveform(buffer);
+}
+
 void NIDAQOutput::parameterValueChanged(Parameter* parameter)
 {
     if (parameter->getName() == "device")

@@ -55,6 +55,8 @@ public:
 
     void updateWaveform();
 
+    const Array<float>& getSamples() const { return samples; }
+
     std::function<void()> onPlayRequested;
 
 private:
