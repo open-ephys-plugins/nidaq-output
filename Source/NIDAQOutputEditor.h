@@ -27,6 +27,7 @@
 
 #include <EditorHeaders.h>
 #include "NIDAQOutput.h"
+#include "WaveformView.h"
 #include <SerialLib.h>
 
 class NIDAQOutputEditor;
@@ -76,7 +77,8 @@ private:
 };
 
 class NIDAQOutputEditor : public GenericEditor,
-                            public Button::Listener
+                            public Button::Listener,
+                            public ComboBox::Listener
 {
 public:
     /** Constructor*/
@@ -94,8 +96,17 @@ public:
     /** Called when a button gets pressed */
     void buttonEvent(Button* button);
 
+    /** ComboBox callback */
+    void comboBoxChanged(ComboBox* comboBoxThatHasChanged) override;
+
     /** Gets the latest device from the processor*/
     void updateDevice(String deviceName);
+
+    /** Sync Play button visibility with trigger mode */
+    void updateTriggerUI();
+
+    /** Refresh waveform preview from processor sample rate / type */
+    void refreshWaveformView();
 
     int getTotalAvailableAnalogOutputs() { return processor->getTotalAvailableAnalogOutputs(); };
 	int getTotalAvailableDigitalOutputs() { return processor-> getTotalAvailableDigitalOutputs(); };
@@ -114,9 +125,15 @@ public:
 	
 private:
 
+    void openSettingsInterface(Button* button);
+
     NIDAQOutput* processor;
 
-	ScopedPointer<UtilityButton> configureDeviceButton;
+    std::unique_ptr<Label> waveformLabel;
+    std::unique_ptr<ComboBox> waveformSelector;
+	std::unique_ptr<UtilityButton> settingsButton;
+	std::unique_ptr<UtilityButton> configureDeviceButton;
+    std::unique_ptr<WaveformView> waveformView;
 
 	PopupConfigurationWindow* currentConfigWindow;
 

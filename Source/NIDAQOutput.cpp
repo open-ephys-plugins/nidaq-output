@@ -243,10 +243,11 @@ void NIDAQOutput::parameterValueChanged(Parameter* parameter)
             auto* outputParam = (CategoricalParameter*) getParameter("output");
             outputParam->setCategories(outputChannels);
 
-            if (auto* editor = dynamic_cast<GenericEditor*>(getEditor()))
+            if (auto* editor = dynamic_cast<NIDAQOutputEditor*>(getEditor()))
             {
                 if (auto* pe = editor->getParameterEditor("output"))
                     pe->updateView();
+                editor->refreshWaveformView();
             }
 
             const DeviceOutputInfo& outputs = getDeviceOutputInfo(devices[idx]->getName());
@@ -258,6 +259,11 @@ void NIDAQOutput::parameterValueChanged(Parameter* parameter)
     {
         const String mode = ((CategoricalParameter*) parameter)->getSelectedString();
         getParameter("output")->setEnabled(mode != "Remote");
+    }
+    else if (parameter->getName() == "trigger")
+    {
+        if (auto* editor = dynamic_cast<NIDAQOutputEditor*>(getEditor()))
+            editor->updateTriggerUI();
     }
     else if (parameter->getName() == "outputMode")
     {

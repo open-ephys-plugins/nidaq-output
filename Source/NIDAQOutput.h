@@ -178,9 +178,10 @@ public:
     /** Creates the NIDAQOutputEditor. */
     AudioProcessorEditor* createEditor() override;
 
-private:
+    /** Play the current custom waveform (manual trigger) */
     void playCustomWaveform();
 
+private:
     /* Manages connected NIDAQ devices */
     ScopedPointer<NIDAQmxDeviceManager> dm;
 

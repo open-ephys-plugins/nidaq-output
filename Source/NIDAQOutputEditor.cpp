@@ -30,18 +30,52 @@ NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
 {
     processor = (NIDAQOutput*) getProcessor();
 
-    desiredWidth = 200;
+    desiredWidth = 380;
 
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "device", 15, 29);
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "config", 15, 54);
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "output", 15, 79);
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "trigger", 15, 104);
 
-	configureDeviceButton = new UtilityButton("...");
-	configureDeviceButton->setBounds(175, 29, 24, 12);
-	configureDeviceButton->addListener(this);
-	configureDeviceButton->setAlpha(0.5f);
-	addAndMakeVisible(configureDeviceButton);
+    waveformLabel = std::make_unique<Label>("WaveformLabel", "Waveform:");
+    waveformLabel->setFont(Font(13.0f));
+    waveformLabel->setBounds(190, 29, 65, 20);
+    addAndMakeVisible(waveformLabel.get());
+
+    waveformSelector = std::make_unique<ComboBox>("WaveformSelector");
+    waveformSelector->setBounds(255, 29, 70, 20);
+    waveformSelector->addItem("Pulse", (int) WaveformType::pulse);
+    waveformSelector->addItem("Sine", (int) WaveformType::sine);
+    waveformSelector->addItem("Custom", (int) WaveformType::custom);
+    waveformSelector->setSelectedId((int) WaveformType::pulse, dontSendNotification);
+    waveformSelector->addListener(this);
+    addAndMakeVisible(waveformSelector.get());
+
+    settingsButton = std::make_unique<UtilityButton>("*");
+    settingsButton->setBounds(330, 29, 20, 20);
+    settingsButton->addListener(this);
+    settingsButton->setAlpha(0.5f);
+    settingsButton->setTooltip("Open settings interface");
+    addAndMakeVisible(settingsButton.get());
+
+    configureDeviceButton = std::make_unique<UtilityButton>("...");
+    configureDeviceButton->setBounds(352, 29, 24, 20);
+    configureDeviceButton->addListener(this);
+    configureDeviceButton->setAlpha(0.5f);
+    configureDeviceButton->setTooltip("Open settings interface");
+    addAndMakeVisible(configureDeviceButton.get());
+
+    waveformView = std::make_unique<WaveformView>();
+    waveformView->setBounds(190, 52, 180, 80);
+    waveformView->onPlayRequested = [this]()
+    {
+        if (processor != nullptr)
+            processor->playCustomWaveform();
+    };
+    addAndMakeVisible(waveformView.get());
+
+    refreshWaveformView();
+    updateTriggerUI();
 }
 
 void NIDAQOutputEditor::update(int numAnalog, int numDigital, int digitalWriteSize)
@@ -79,22 +113,48 @@ void NIDAQOutputEditor::buttonClicked(Button* button)
 
 void NIDAQOutputEditor::buttonEvent(Button* button)
 {
-	if (button == configureDeviceButton)
-	{
-		if (!CoreServices::getAcquisitionStatus())
-        {
-            currentConfigWindow = new PopupConfigurationWindow(this);
-            CallOutBox& myBox
-                = CallOutBox::launchAsynchronously(std::unique_ptr<Component>(currentConfigWindow),
-                    button->getScreenBounds(),
-                    nullptr);
+	if (button == configureDeviceButton.get() || button == settingsButton.get())
+        openSettingsInterface(button);
+}
 
-            myBox.setDismissalMouseClicksAreAlwaysConsumed(true);
+void NIDAQOutputEditor::openSettingsInterface(Button* button)
+{
+    if (!CoreServices::getAcquisitionStatus())
+    {
+        currentConfigWindow = new PopupConfigurationWindow(this);
+        CallOutBox& myBox
+            = CallOutBox::launchAsynchronously(std::unique_ptr<Component>(currentConfigWindow),
+                button->getScreenBounds(),
+                nullptr);
 
-            return;
+        myBox.setDismissalMouseClicksAreAlwaysConsumed(true);
+    }
+}
 
-        }
-	}
+void NIDAQOutputEditor::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
+{
+    if (comboBoxThatHasChanged == waveformSelector.get() && waveformView != nullptr)
+    {
+        waveformView->setWaveformType((WaveformType) waveformSelector->getSelectedId());
+    }
+}
+
+void NIDAQOutputEditor::updateTriggerUI()
+{
+    if (processor == nullptr || waveformView == nullptr)
+        return;
+
+    auto* triggerParam = (CategoricalParameter*) processor->getParameter("trigger");
+    const bool isManual = triggerParam != nullptr && triggerParam->getSelectedString() == "Manual";
+    waveformView->setPlayButtonVisible(isManual);
+}
+
+void NIDAQOutputEditor::refreshWaveformView()
+{
+    if (processor == nullptr || waveformView == nullptr)
+        return;
+
+    waveformView->setSampleRate((float) processor->getAnalogOutputSampleRate());
 }
 
 void NIDAQOutputEditor::updateDevice(String deviceName)
