@@ -150,12 +150,6 @@ public:
         return mNIDAQ != nullptr ? mNIDAQ->getSourceTypeForOutput(outputIndex) : SOURCE_TYPE::RSE;
     };
 
-    /** Set Analog channel enabled state */
-    void setAnalogEnable(int id, bool enabled) { mNIDAQ->aout[id]->setEnabled(enabled); };
-
-    /** Set Digital channel enabled state */
-    void setDigitalEnable(int id, bool enabled) { mNIDAQ->dout[id]->setEnabled(enabled); };
-
     /** Get the available output voltage ranges for this device */
     Array<SettingsRange> getVoltageRanges();
 

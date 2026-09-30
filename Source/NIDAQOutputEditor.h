@@ -42,79 +42,11 @@ class NIDAQOutputEditor;
 class EditorBackground : public Component
 {
 public:
-	EditorBackground(int nAO, int nDO);
+	EditorBackground(int settingsOffsetX);
 
 private:
 	void paint(Graphics& g);
-	int nAO;
-	int nDO;
-};
-
-class AOButton : public ToggleButton, public Timer
-{
-public:
-	AOButton(int id, NIDAQOutput*);
-
-	void setId(int id);
-	int getId(); 
-	void setEnabled(bool);
-	void timerCallback();
-
-	NIDAQOutput* processor;
-
-	friend class NIDAQOutputEditor;
-
-private:
-	void paintButton(Graphics& g, bool isMouseOver, bool isButtonDown);
-
-	int id;
-	bool enabled;
-
-};
-
-class DOButton : public ToggleButton, public Timer
-{
-public:
-	DOButton(int id, NIDAQOutput*);
-
-	void setId(int id);
-	int getId();
-	void setEnabled(bool);
-	void timerCallback();
-
-	NIDAQOutput* processor;
-
-	friend class NIDAQOutputEditor;
-
-private:
-	void paintButton(Graphics& g, bool isMouseOver, bool isButtonDown);
-
-	int id;
-	bool enabled;
-
-};
-
-class SourceTypeButton : public TextButton, public Timer
-{
-public:
-	SourceTypeButton(int id, NIDAQOutput* processor, SOURCE_TYPE source);
-
-	void setId(int id);
-	int getId();
-	void toggleSourceType();
-	void timerCallback();
-
-	void update(SOURCE_TYPE sourceType);
-
-	NIDAQOutput* processor;
-
-	friend class NIDAQEditor;
-
-private:
-
-	int id;
-	bool enabled;
-
+	int settingsOffsetX;
 };
 
 class PopupConfigurationWindow : public Component, public ComboBox::Listener, public Button::Listener
@@ -200,10 +132,6 @@ public:
 private:
 
     NIDAQOutput* processor;
-
-    OwnedArray<AOButton> aoButtons;
-	OwnedArray<TextButton> sourceTypeButtons;
-	OwnedArray<DOButton> doButtons;
 
 	ScopedPointer<ComboBox> deviceSelectBox;
 	ScopedPointer<ComboBox> sampleRateSelectBox;
