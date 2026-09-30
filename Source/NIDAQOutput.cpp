@@ -102,6 +102,35 @@ void NIDAQOutput::registerParameters()
         "Analog output mode",
         {"Mirror Input", "Custom Waveform"},
         1);
+
+    Array<String> deviceNames;
+    for (int i = 0; i < dm->getNumAvailableDevices(); i++)
+        deviceNames.add(getDeviceSelectLabel(i));
+    if (deviceNames.isEmpty())
+        deviceNames.add("No Device");
+
+    addCategoricalParameter(Parameter::PROCESSOR_SCOPE, "device", "Device",
+        "The NIDAQ device to use", deviceNames, deviceIndex, true);
+
+    addCategoricalParameter(Parameter::PROCESSOR_SCOPE, "config", "Config",
+        "Output configuration mode", {"Local", "Remote", "Mirror"}, 0, true);
+
+    Array<String> outputChannels;
+    const int numAo = mNIDAQ != nullptr ? getTotalAvailableAnalogOutputs() : 0;
+    for (int i = 0; i < numAo; i++)
+        outputChannels.add("AO" + String(i));
+    if (outputChannels.isEmpty())
+        outputChannels.add("AO0");
+
+    addCategoricalParameter(Parameter::PROCESSOR_SCOPE, "output", "Output",
+        "Analog output channel", outputChannels, 0, true);
+
+    Array<String> triggerOptions {"Manual", "Network"};
+    for (int i = 1; i <= 8; i++)
+        triggerOptions.add("TTL" + String(i));
+
+    addCategoricalParameter(Parameter::PROCESSOR_SCOPE, "trigger", "Trigger",
+        "Trigger source", triggerOptions, 0, true);
 }
 
 String NIDAQOutput::handleConfigMessage(const String& message)
@@ -197,7 +226,40 @@ void NIDAQOutput::playCustomWaveform()
 
 void NIDAQOutput::parameterValueChanged(Parameter* parameter)
 {
-    if (parameter->getName() == "outputMode")
+    if (parameter->getName() == "device")
+    {
+        const int idx = (int) parameter->getValue();
+        Array<NIDAQDevice*> devices = getDevices();
+        if (idx >= 0 && idx < devices.size())
+        {
+            setDevice(devices[idx]->getName());
+
+            Array<String> outputChannels;
+            for (int i = 0; i < getTotalAvailableAnalogOutputs(); i++)
+                outputChannels.add("AO" + String(i));
+            if (outputChannels.isEmpty())
+                outputChannels.add("AO0");
+
+            auto* outputParam = (CategoricalParameter*) getParameter("output");
+            outputParam->setCategories(outputChannels);
+
+            if (auto* editor = dynamic_cast<GenericEditor*>(getEditor()))
+            {
+                if (auto* pe = editor->getParameterEditor("output"))
+                    pe->updateView();
+            }
+
+            const DeviceOutputInfo& outputs = getDeviceOutputInfo(devices[idx]->getName());
+            LOGC("Selected device ", devices[idx]->getName(), ": ", outputs.getSummary());
+            CoreServices::updateSignalChain(this);
+        }
+    }
+    else if (parameter->getName() == "config")
+    {
+        const String mode = ((CategoricalParameter*) parameter)->getSelectedString();
+        getParameter("output")->setEnabled(mode != "Remote");
+    }
+    else if (parameter->getName() == "outputMode")
     {
         const String mode = parameter->getValue().toString();
         if (mode.equalsIgnoreCase("MIRROR_INPUT") || mode.equalsIgnoreCase("Mirror Input"))

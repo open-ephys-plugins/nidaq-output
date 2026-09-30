@@ -24,58 +24,24 @@
 #include "NIDAQOutputEditor.h"
 #include <stdio.h>
 
-EditorBackground::EditorBackground(int settingsOffsetX) : settingsOffsetX(settingsOffsetX) {}
-
-void EditorBackground::paint(Graphics& g)
-{
-	g.setColour(Colours::darkgrey);
-	g.setFont(10);
-
-	g.drawText(String("DEVICE"), settingsOffsetX, 13, 100, 10, Justification::centredLeft);
-}
-
 NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
     : GenericEditor(parentNode)
 
 {
-    draw();
-}
+    processor = (NIDAQOutput*) getProcessor();
 
-void NIDAQOutputEditor::draw()
-{
-    processor = (NIDAQOutput*)getProcessor();
+    desiredWidth = 200;
 
-	int xOffset = 15;
-
-	deviceSelectBox = new ComboBox("DeviceSelectBox");
-	deviceSelectBox->setBounds(xOffset, 39, 85, 20);
-    deviceSelectBox->addListener(this);
-    Array<NIDAQDevice*> devices = processor->getDevices();
-	for (int i = 0; i < devices.size(); i++)
-	{
-		deviceSelectBox->addItem(processor->getDeviceSelectLabel(i), i + 1);
-	}
-    deviceSelectBox->setSelectedId(processor->getDeviceIndex() + 1, dontSendNotification);
-	deviceSelectBox->setTooltip(processor->getDeviceOutputInfo(processor->getDeviceName()).getSummary());
-    addAndMakeVisible(deviceSelectBox.get());
-
-	if (processor->getDevices().size() == 1)	// disable device selection if only one device is available
-		deviceSelectBox->setEnabled(false);
+    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "device", 15, 29);
+    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "config", 15, 54);
+    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "output", 15, 79);
+    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "trigger", 15, 104);
 
 	configureDeviceButton = new UtilityButton("...");
-	configureDeviceButton->setBounds(xOffset + 60, 25, 24, 12);
+	configureDeviceButton->setBounds(175, 29, 24, 12);
 	configureDeviceButton->addListener(this);
 	configureDeviceButton->setAlpha(0.5f);
 	addAndMakeVisible(configureDeviceButton);
-	
-	desiredWidth = xOffset + 100;
-
-	background = new EditorBackground(xOffset);
-	background->setBounds(0, 15, 1000, 150);
-	addAndMakeVisible(background);
-	background->toBack();
-	background->repaint();
-
 }
 
 void NIDAQOutputEditor::update(int numAnalog, int numDigital, int digitalWriteSize)
@@ -102,24 +68,8 @@ void NIDAQOutputEditor::update(int numAnalog, int numDigital, int digitalWriteSi
 		processor->setDigitalWriteSize(digitalWriteSize);
 	}
 
-	draw();
-
 	CoreServices::updateSignalChain(this);
 
-}
-
-void NIDAQOutputEditor::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
-{
-    if (comboBoxThatHasChanged == deviceSelectBox)
-    {
-        int deviceIndex = deviceSelectBox->getSelectedItemIndex();
-        const String deviceName = processor->getDevices()[deviceIndex]->getName();
-        processor->setDevice(deviceName);
-		const DeviceOutputInfo& outputs = processor->getDeviceOutputInfo(deviceName);
-		deviceSelectBox->setTooltip(outputs.getSummary());
-		LOGC("Selected device ", deviceName, ": ", outputs.getSummary());
-        CoreServices::updateSignalChain(this);
-    }
 }
 
 void NIDAQOutputEditor::buttonClicked(Button* button)
@@ -150,21 +100,17 @@ void NIDAQOutputEditor::buttonEvent(Button* button)
 void NIDAQOutputEditor::updateDevice(String deviceName)
 {
 	juce::ignoreUnused(deviceName);
-	if (deviceSelectBox != nullptr && processor != nullptr)
-	{
-		const int idx = processor->getDeviceIndex();
-		if (idx >= 0 && idx < deviceSelectBox->getNumItems())
-			deviceSelectBox->setSelectedId(idx + 1, dontSendNotification);
-	}
+	if (processor == nullptr)
+		return;
 
-	draw();
+	auto* deviceParam = (CategoricalParameter*) processor->getParameter("device");
+	if (deviceParam != nullptr)
+		deviceParam->setNextValue(processor->getDeviceIndex(), false);
 }
 
 PopupConfigurationWindow::PopupConfigurationWindow(NIDAQOutputEditor* editor_)
     : editor(editor_)
 {
-    //tableHeader.reset(new TableHeaderComponent());
-
 	analogLabel = new Label ("Analog", "Analog Outputs: ");
 	analogLabel->setFont(Font(16.0f, Font::bold));
 	analogLabel->setColour(Label::textColourId, Colours::white);
@@ -233,6 +179,7 @@ PopupConfigurationWindow::PopupConfigurationWindow(NIDAQOutputEditor* editor_)
 
 void PopupConfigurationWindow::comboBoxChanged(ComboBox* comboBox)
 {
+	juce::ignoreUnused(comboBox);
 	int numAnalogOutputs = int(analogChannelCountSelect->getItemText(analogChannelCountSelect->getSelectedId() - 1).getFloatValue());
 	int numDigitalOutputs = int(digitalChannelCountSelect->getItemText(digitalChannelCountSelect->getSelectedId() - 1).getFloatValue());
 	int digitalWrite = int(digitalWriteSelect->getItemText(digitalWriteSelect->getSelectedId() - 1).getFloatValue());
@@ -242,7 +189,6 @@ void PopupConfigurationWindow::comboBoxChanged(ComboBox* comboBox)
 
 void PopupConfigurationWindow::paint(juce::Graphics& g)
 {
-	// Set the background color of toggle buttons based on their state
 	for (int i = 0; i < digitalPortButtons.size(); ++i)
 	{
 		ToggleButton* button = digitalPortButtons[i];
@@ -284,7 +230,6 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 
     float sampleRate = xml->getStringAttribute("sampleRate", "0.0").getFloatValue();
 
-	// Load sample rate
 	if (sampleRate > 0.0f)
 	{
 		int idx = 0;
@@ -300,7 +245,6 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 		}
 	}
 
-	// Load voltage range
 	int voltageRangeIndex = xml->getStringAttribute("voltageRange", "-1").getIntValue();
 
 	if (voltageRangeIndex >= 0)
@@ -308,7 +252,6 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 		processor->setVoltageRange(voltageRangeIndex);
 	}
 
-	// Load number of active analog channels
 	int numAnalog = xml->getStringAttribute("numAnalog", "0").getIntValue();
 
 	if (numAnalog >= 0)
@@ -317,7 +260,6 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 		processor->updateAnalogChannels();
 	}
 
-	// Load number of active digital channels
 	int numDigital = xml->getStringAttribute("numDigital", "0").getIntValue();
 
 	if (numDigital >= 0)
@@ -326,7 +268,6 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 		processor->updateDigitalChannels();
 	}
 
-	// Load digital read size
 	int digitalWriteSize = xml->getStringAttribute("digitalWriteSize", "0").getIntValue();
 
 	if (digitalWriteSize >= 0)
@@ -339,7 +280,4 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 	const int nPorts = processor->getNumPorts();
 	for (int i = 0; i < digitalPortStates.length() && i < nPorts; i++)
 		processor->setPortState(i, digitalPortStates[i] == '1');
-
-	draw();
-
 }

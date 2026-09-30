@@ -39,16 +39,6 @@ class NIDAQOutputEditor;
 
 */
 
-class EditorBackground : public Component
-{
-public:
-	EditorBackground(int settingsOffsetX);
-
-private:
-	void paint(Graphics& g);
-	int settingsOffsetX;
-};
-
 class PopupConfigurationWindow : public Component, public ComboBox::Listener, public Button::Listener
 {
 
@@ -86,7 +76,6 @@ private:
 };
 
 class NIDAQOutputEditor : public GenericEditor,
-                            public ComboBox::Listener,
                             public Button::Listener
 {
 public:
@@ -96,14 +85,8 @@ public:
     /** Destructor*/
     ~NIDAQOutputEditor() { }
 
-    /** Called whenever the editor updates UI elements */
-    void draw();
-
     /** Called when device configuration is changed */
     void update(int analogCount, int digitalCount, int digitalWrite);
-
-    /** Called when a combo box selection is changed */
-    void comboBoxChanged(ComboBox* comboBoxThatHasChanged);
 
     /** Respond to button presses */
 	void buttonClicked(Button* button) override;
@@ -133,16 +116,7 @@ private:
 
     NIDAQOutput* processor;
 
-	ScopedPointer<ComboBox> deviceSelectBox;
-    //TODO: Potentially use to monitor arbitrary wave generation CPU usage
-    //ScopedPointer<FifoMonitor> fifoMonitor;
-
 	ScopedPointer<UtilityButton> configureDeviceButton;
-
-	Array<File> savingDirectories;
-
-	//ScopedPointer<BackgroundLoader> uiLoader;
-	ScopedPointer<EditorBackground> background;
 
 	PopupConfigurationWindow* currentConfigWindow;
 
