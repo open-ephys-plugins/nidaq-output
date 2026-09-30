@@ -32,8 +32,6 @@ void EditorBackground::paint(Graphics& g)
 	g.setFont(10);
 
 	g.drawText(String("DEVICE"), settingsOffsetX, 13, 100, 10, Justification::centredLeft);
-	g.drawText(String("SAMPLE RATE"), settingsOffsetX, 45, 100, 10, Justification::centredLeft);
-	g.drawText(String("AO VOLTAGE RANGE"), settingsOffsetX, 77, 100, 10, Justification::centredLeft);
 }
 
 NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
@@ -63,29 +61,6 @@ void NIDAQOutputEditor::draw()
 
 	if (processor->getDevices().size() == 1)	// disable device selection if only one device is available
 		deviceSelectBox->setEnabled(false);
-
-	sampleRateSelectBox = new ComboBox("SampleRateSelectBox");
-	sampleRateSelectBox->setBounds(xOffset, 70, 85, 20);
-	Array<NIDAQ::float64> sampleRates = processor->getSampleRates();
-	for (int i = 0; i < sampleRates.size(); i++)
-	{
-		sampleRateSelectBox->addItem(String(sampleRates[i]) + " S/s", i + 1);
-	}
-	sampleRateSelectBox->setSelectedItemIndex(processor->getSampleRateIndex(), false);
-	sampleRateSelectBox->addListener(this);
-	addAndMakeVisible(sampleRateSelectBox);
-
-	voltageRangeSelectBox = new ComboBox("VoltageRangeSelectBox");
-	voltageRangeSelectBox->setBounds(xOffset, 101, 85, 20);
-	Array<SettingsRange> voltageRanges = processor->getVoltageRanges();
-	for (int i = 0; i < voltageRanges.size(); i++)
-	{
-		String rangeString = String(voltageRanges[i].min) + " - " + String(voltageRanges[i].max) + " V";
-		voltageRangeSelectBox->addItem(rangeString, i + 1);
-	}
-	voltageRangeSelectBox->setSelectedItemIndex(processor->getVoltageRangeIndex(), false);
-	voltageRangeSelectBox->addListener(this);
-	addAndMakeVisible(voltageRangeSelectBox);
 
 	configureDeviceButton = new UtilityButton("...");
 	configureDeviceButton->setBounds(xOffset + 60, 25, 24, 12);
@@ -144,19 +119,6 @@ void NIDAQOutputEditor::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
 		deviceSelectBox->setTooltip(outputs.getSummary());
 		LOGC("Selected device ", deviceName, ": ", outputs.getSummary());
         CoreServices::updateSignalChain(this);
-    }
-    else if (comboBoxThatHasChanged == sampleRateSelectBox)
-    {
-        const int sampleRateIndex = sampleRateSelectBox->getSelectedItemIndex();
-        LOGD("NIDAQOutputEditor::comboBoxChanged sample-rate dropdown selected index=",
-             sampleRateIndex,
-             ", text=", sampleRateSelectBox->getText());
-        processor->setSampleRate(sampleRateIndex);
-        LOGC("Selected analog output sample rate: ", processor->getAnalogOutputSampleRate(), " Hz");
-    }
-    else if (comboBoxThatHasChanged == voltageRangeSelectBox)
-    {
-        processor->setVoltageRange(voltageRangeSelectBox->getSelectedItemIndex());
     }
 }
 
@@ -331,7 +293,7 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 			if (sr == sampleRate)
 			{
 				LOGD("Setting saved sample rate: " + String(sampleRate) + " (" + String(idx) + ")");
-				sampleRateSelectBox->setSelectedItemIndex(idx, true);
+				processor->setSampleRate(idx);
 				break;
 			}
 			idx++;
@@ -344,7 +306,6 @@ void NIDAQOutputEditor::loadCustomParametersFromXml(XmlElement* xml)
 	if (voltageRangeIndex >= 0)
 	{
 		processor->setVoltageRange(voltageRangeIndex);
-		voltageRangeSelectBox->setSelectedItemIndex(processor->getVoltageRangeIndex(), false);
 	}
 
 	// Load number of active analog channels

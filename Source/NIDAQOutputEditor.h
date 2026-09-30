@@ -134,8 +134,6 @@ private:
     NIDAQOutput* processor;
 
 	ScopedPointer<ComboBox> deviceSelectBox;
-	ScopedPointer<ComboBox> sampleRateSelectBox;
-	ScopedPointer<ComboBox> voltageRangeSelectBox;
     //TODO: Potentially use to monitor arbitrary wave generation CPU usage
     //ScopedPointer<FifoMonitor> fifoMonitor;
 
