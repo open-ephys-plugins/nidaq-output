@@ -25,13 +25,7 @@
 #define __WAVEFORMVIEW_H__
 
 #include <EditorHeaders.h>
-
-enum class WaveformType
-{
-    pulse = 1,
-    sine = 2,
-    custom = 3
-};
+#include "AnalogPatternGenerator.h"
 
 /**
     Waveform preview adapted from wave-player WavePlayerBackground.
@@ -47,27 +41,20 @@ public:
     void resized() override;
     void buttonClicked (Button* button) override;
 
-    void setWaveformType (WaveformType type);
-    WaveformType getWaveformType() const { return waveformType; }
-
-    void setSampleRate (float sampleRateHz);
+    void updateFromPattern (Pattern* pattern);
     void setPlayButtonVisible (bool shouldBeVisible);
-
-    void updateWaveform();
 
     const Array<float>& getSamples() const { return samples; }
 
     std::function<void()> onPlayRequested;
 
 private:
-    void buildPulseWaveform();
-    void buildSineWaveform();
     void rebuildPath();
 
-    WaveformType waveformType = WaveformType::pulse;
-    float sampleRate = 30000.0f;
+    PatternType patternType = PatternType::pulse;
     float maxVoltage = 5.0f;
     float durationMs = 100.0f;
+    float sampleRate = 30000.0f;
 
     Array<float> samples;
     Path currentWaveform;

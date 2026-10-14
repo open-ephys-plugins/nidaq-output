@@ -28,28 +28,19 @@ WaveformView::WaveformView()
     playButton = std::make_unique<UtilityButton> ("Play");
     playButton->addListener (this);
     addAndMakeVisible (playButton.get());
-
-    updateWaveform();
 }
 
 void WaveformView::resized()
 {
-    playButton->setBounds (getWidth() - 52, 4, 48, 18);
+    const int buttonWidth = 48;
+    const int buttonHeight = 18;
+    // Align under the voltage labels in the right margin of the plot
+    const int labelColumnX = getWidth() - 28;
+    playButton->setBounds (labelColumnX + (28 - buttonWidth) / 2 - 10,
+                           (getHeight() - buttonHeight) / 2 - 8,
+                           buttonWidth,
+                           buttonHeight);
     rebuildPath();
-}
-
-void WaveformView::setWaveformType (WaveformType type)
-{
-    waveformType = type;
-    updateWaveform();
-}
-
-void WaveformView::setSampleRate (float sampleRateHz)
-{
-    if (sampleRateHz > 0.0f)
-        sampleRate = sampleRateHz;
-
-    updateWaveform();
 }
 
 void WaveformView::setPlayButtonVisible (bool shouldBeVisible)
@@ -63,56 +54,29 @@ void WaveformView::buttonClicked (Button* button)
         onPlayRequested();
 }
 
-void WaveformView::updateWaveform()
+void WaveformView::updateFromPattern (Pattern* pattern)
 {
-    if (waveformType == WaveformType::sine)
-        buildSineWaveform();
+    samples.clear();
+
+    if (pattern == nullptr)
+    {
+        rebuildPath();
+        repaint();
+        return;
+    }
+
+    patternType = pattern->patternType;
+    maxVoltage = pattern->maxVoltage > 0.0f ? pattern->maxVoltage : 5.0f;
+    sampleRate = pattern->sampleRate > 0.0f ? pattern->sampleRate : 30000.0f;
+    samples = pattern->samples;
+
+    if (sampleRate > 0.0f && samples.size() > 0)
+        durationMs = 1000.0f * (float) samples.size() / sampleRate;
     else
-        buildPulseWaveform();
+        durationMs = 100.0f;
 
     rebuildPath();
     repaint();
-}
-
-void WaveformView::buildPulseWaveform()
-{
-    // Pulse shape within a 100 ms window (matches mockup axis)
-    const float onDurationMs = 40.0f;
-    const float offDurationMs = 60.0f;
-    maxVoltage = 5.0f;
-    durationMs = onDurationMs + offDurationMs;
-
-    samples.clear();
-
-    const float numOnSamples = sampleRate * onDurationMs / 1000.0f;
-    const float numOffSamples = sampleRate * offDurationMs / 1000.0f;
-
-    for (float i = 0; i < numOnSamples; i++)
-        samples.add (maxVoltage);
-
-    for (float i = 0; i < numOffSamples; i++)
-        samples.add (0.0f);
-
-    samples.add (0.0f);
-}
-
-void WaveformView::buildSineWaveform()
-{
-    // Matches wave-player SinePatternGenerator defaults (5 Hz, 1 cycle)
-    const float frequency = 5.0f;
-    const float cycles = 1.0f;
-    maxVoltage = 5.0f;
-    durationMs = 1000.0f * cycles / frequency;
-
-    samples.clear();
-
-    const int numSamples = juce::jmax (1, (int) (sampleRate * durationMs / 1000.0f));
-
-    for (int i = 0; i < numSamples; i++)
-    {
-        const float t = (float) i / sampleRate;
-        samples.add (maxVoltage * std::sin (MathConstants<float>::twoPi * frequency * t));
-    }
 }
 
 void WaveformView::rebuildPath()
@@ -125,14 +89,8 @@ void WaveformView::rebuildPath()
     const float numSamples = (float) samples.size();
     float voltageScale = maxVoltage == 0.0f ? 5.0f : maxVoltage;
 
-    // Normalize to 0..1 for both axes (y: 1 = 0 V, 0 = maxVoltage for positive pulses;
-    // allow negative for sine by mapping [-max, +max] -> [1, 0])
-    const bool bipolar = (waveformType == WaveformType::sine);
-
-    auto sampleToY = [bipolar, voltageScale] (float sample) -> float
+    auto sampleToY = [voltageScale] (float sample) -> float
     {
-        if (bipolar)
-            return 0.5f - 0.5f * (sample / voltageScale);
         return 1.0f - sample / voltageScale;
     };
 
@@ -180,9 +138,7 @@ void WaveformView::paint (Graphics& g)
     g.setFont (10.0f);
 
     const String maxLabel = String (maxVoltage, maxVoltage == (float) (int) maxVoltage ? 0 : 1) + " V";
-    const String minLabel = (waveformType == WaveformType::sine)
-                                ? String (-maxVoltage, maxVoltage == (float) (int) maxVoltage ? 0 : 1) + " V"
-                                : "0 V";
+    const String minLabel = "0 V";
 
     g.drawText (maxLabel, (int) plotArea.getRight() + 2, (int) plotArea.getY(), 26, 12, Justification::centredLeft);
     g.drawText (minLabel, (int) plotArea.getRight() + 2, (int) plotArea.getBottom() - 12, 26, 12, Justification::centredLeft);

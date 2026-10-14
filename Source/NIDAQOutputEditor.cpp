@@ -32,6 +32,8 @@ NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
 
     desiredWidth = 380;
 
+    currentPattern = std::make_unique<Pattern>();
+
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "device", 15, 29);
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "config", 15, 54);
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "output", 15, 79);
@@ -39,34 +41,34 @@ NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
 
     waveformLabel = std::make_unique<Label>("WaveformLabel", "Waveform:");
     waveformLabel->setFont(Font(13.0f));
-    waveformLabel->setBounds(190, 29, 65, 20);
+    waveformLabel->setBounds(170, 29, 65, 20);
     addAndMakeVisible(waveformLabel.get());
 
     waveformSelector = std::make_unique<ComboBox>("WaveformSelector");
-    waveformSelector->setBounds(255, 29, 70, 20);
-    waveformSelector->addItem("Pulse", (int) WaveformType::pulse);
-    waveformSelector->addItem("Sine", (int) WaveformType::sine);
-    waveformSelector->addItem("Custom", (int) WaveformType::custom);
-    waveformSelector->setSelectedId((int) WaveformType::pulse, dontSendNotification);
+    waveformSelector->setBounds(235, 29, 70, 20);
+    waveformSelector->addItem("Pulse", (int) PatternType::pulse + 1);
+    waveformSelector->addItem("Sine", (int) PatternType::sine + 1);
+    waveformSelector->addItem("Custom", (int) PatternType::custom + 1);
+    waveformSelector->setSelectedId((int) PatternType::pulse + 1, dontSendNotification);
     waveformSelector->addListener(this);
     addAndMakeVisible(waveformSelector.get());
 
     settingsButton = std::make_unique<UtilityButton>("*");
-    settingsButton->setBounds(330, 29, 20, 20);
+    settingsButton->setBounds(310, 29, 20, 20);
     settingsButton->addListener(this);
     settingsButton->setAlpha(0.5f);
-    settingsButton->setTooltip("Open settings interface");
+    settingsButton->setTooltip("Configure waveform");
     addAndMakeVisible(settingsButton.get());
 
     configureDeviceButton = std::make_unique<UtilityButton>("...");
-    configureDeviceButton->setBounds(352, 29, 24, 20);
+    configureDeviceButton->setBounds(332, 29, 24, 20);
     configureDeviceButton->addListener(this);
     configureDeviceButton->setAlpha(0.5f);
-    configureDeviceButton->setTooltip("Open settings interface");
+    configureDeviceButton->setTooltip("Open device settings");
     addAndMakeVisible(configureDeviceButton.get());
 
     waveformView = std::make_unique<WaveformView>();
-    waveformView->setBounds(190, 52, 180, 80);
+    waveformView->setBounds(170, 52, 210, 80);
     waveformView->onPlayRequested = [this]()
     {
         if (processor != nullptr && waveformView != nullptr)
@@ -74,7 +76,7 @@ NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
     };
     addAndMakeVisible(waveformView.get());
 
-    refreshWaveformView();
+    rebuildCurrentPattern();
     updateTriggerUI();
 }
 
@@ -113,11 +115,13 @@ void NIDAQOutputEditor::buttonClicked(Button* button)
 
 void NIDAQOutputEditor::buttonEvent(Button* button)
 {
-	if (button == configureDeviceButton.get() || button == settingsButton.get())
-        openSettingsInterface(button);
+	if (button == configureDeviceButton.get())
+        openDeviceSettings(button);
+    else if (button == settingsButton.get())
+        openWaveformSettings(button);
 }
 
-void NIDAQOutputEditor::openSettingsInterface(Button* button)
+void NIDAQOutputEditor::openDeviceSettings(Button* button)
 {
     if (!CoreServices::getAcquisitionStatus())
     {
@@ -131,12 +135,74 @@ void NIDAQOutputEditor::openSettingsInterface(Button* button)
     }
 }
 
+void NIDAQOutputEditor::openWaveformSettings(Button* button)
+{
+    if (currentPattern == nullptr)
+        return;
+
+    AnalogPatternGenerator* patternGenerator = nullptr;
+    const auto type = currentPattern->patternType;
+
+    if (type == PatternType::pulse)
+        patternGenerator = new PulsePatternGenerator(this, currentPattern.get());
+    else if (type == PatternType::sine)
+        patternGenerator = new SinePatternGenerator(this, currentPattern.get());
+    else
+        patternGenerator = new CustomPatternGenerator(this, currentPattern.get());
+
+    patternGenerator->buildWaveform();
+    updateWaveform();
+
+    CallOutBox::launchAsynchronously(std::unique_ptr<Component>(patternGenerator),
+                                     button->getScreenBounds(),
+                                     nullptr);
+}
+
 void NIDAQOutputEditor::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
 {
-    if (comboBoxThatHasChanged == waveformSelector.get() && waveformView != nullptr)
+    if (comboBoxThatHasChanged == waveformSelector.get() && currentPattern != nullptr)
     {
-        waveformView->setWaveformType((WaveformType) waveformSelector->getSelectedId());
+        currentPattern->patternType = (PatternType) (waveformSelector->getSelectedId() - 1);
+        rebuildCurrentPattern();
     }
+}
+
+float NIDAQOutputEditor::getSampleRate()
+{
+    if (processor != nullptr)
+    {
+        const float rate = (float) processor->getAnalogOutputSampleRate();
+        if (rate > 0.0f)
+            return rate;
+    }
+    return 30000.0f;
+}
+
+void NIDAQOutputEditor::updateWaveform()
+{
+    if (waveformView != nullptr && currentPattern != nullptr)
+        waveformView->updateFromPattern(currentPattern.get());
+}
+
+void NIDAQOutputEditor::rebuildCurrentPattern()
+{
+    if (currentPattern == nullptr)
+        return;
+
+    AnalogPatternGenerator* patternGenerator = nullptr;
+    const auto type = currentPattern->patternType;
+
+    if (type == PatternType::pulse)
+        patternGenerator = new PulsePatternGenerator(this, currentPattern.get());
+    else if (type == PatternType::sine)
+        patternGenerator = new SinePatternGenerator(this, currentPattern.get());
+    else
+        patternGenerator = new CustomPatternGenerator(this, currentPattern.get());
+
+    patternGenerator->buildWaveform();
+    delete patternGenerator;
+
+    updateWaveform();
 }
 
 void NIDAQOutputEditor::updateTriggerUI()
@@ -151,10 +217,7 @@ void NIDAQOutputEditor::updateTriggerUI()
 
 void NIDAQOutputEditor::refreshWaveformView()
 {
-    if (processor == nullptr || waveformView == nullptr)
-        return;
-
-    waveformView->setSampleRate((float) processor->getAnalogOutputSampleRate());
+    rebuildCurrentPattern();
 }
 
 void NIDAQOutputEditor::updateDevice(String deviceName)

@@ -28,6 +28,7 @@
 #include <EditorHeaders.h>
 #include "NIDAQOutput.h"
 #include "WaveformView.h"
+#include "AnalogPatternGenerator.h"
 #include <SerialLib.h>
 
 class NIDAQOutputEditor;
@@ -78,7 +79,8 @@ private:
 
 class NIDAQOutputEditor : public GenericEditor,
                             public Button::Listener,
-                            public ComboBox::Listener
+                            public ComboBox::Listener,
+                            public AnalogPatternHost
 {
 public:
     /** Constructor*/
@@ -99,13 +101,17 @@ public:
     /** ComboBox callback */
     void comboBoxChanged(ComboBox* comboBoxThatHasChanged) override;
 
+    /** AnalogPatternHost */
+    float getSampleRate() override;
+    void updateWaveform() override;
+
     /** Gets the latest device from the processor*/
     void updateDevice(String deviceName);
 
     /** Sync Play button visibility with trigger mode */
     void updateTriggerUI();
 
-    /** Refresh waveform preview from processor sample rate / type */
+    /** Refresh waveform preview / sample rate */
     void refreshWaveformView();
 
     int getTotalAvailableAnalogOutputs() { return processor->getTotalAvailableAnalogOutputs(); };
@@ -125,9 +131,13 @@ public:
 	
 private:
 
-    void openSettingsInterface(Button* button);
+    void openDeviceSettings(Button* button);
+    void openWaveformSettings(Button* button);
+    void rebuildCurrentPattern();
 
     NIDAQOutput* processor;
+
+    std::unique_ptr<Pattern> currentPattern;
 
     std::unique_ptr<Label> waveformLabel;
     std::unique_ptr<ComboBox> waveformSelector;
