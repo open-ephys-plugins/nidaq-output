@@ -181,7 +181,11 @@ float NIDAQOutputEditor::getSampleRate()
 void NIDAQOutputEditor::updateWaveform()
 {
     if (waveformView != nullptr && currentPattern != nullptr)
+    {
         waveformView->updateFromPattern(currentPattern.get());
+        if (processor != nullptr)
+            processor->setTriggeredWaveformSamples(waveformView->getSamples());
+    }
 }
 
 void NIDAQOutputEditor::rebuildCurrentPattern()

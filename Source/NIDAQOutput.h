@@ -184,7 +184,13 @@ public:
     /** Play arbitrary samples on the analog output (manual trigger) */
     void playWaveformSamples(const Array<float>& samples);
 
+    /** Cache samples used for Manual / TTL / Network triggers */
+    void setTriggeredWaveformSamples(const Array<float>& samples);
+
 private:
+    void playTriggeredWaveform();
+    int getSelectedTtlTriggerLine() const;
+
     /* Manages connected NIDAQ devices */
     ScopedPointer<NIDAQmxDeviceManager> dm;
 
@@ -205,6 +211,9 @@ private:
     double lastSampleRate = 0;
 
     bool outputEnabled = false;
+
+    CriticalSection waveformLock;
+    Array<float> triggeredWaveformSamples;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NIDAQOutput);
 };

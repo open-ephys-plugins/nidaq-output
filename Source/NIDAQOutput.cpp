@@ -245,6 +245,36 @@ void NIDAQOutput::playWaveformSamples(const Array<float>& samples)
     mNIDAQ->writeAnalogWaveform(buffer, outputChannel);
 }
 
+void NIDAQOutput::setTriggeredWaveformSamples(const Array<float>& samples)
+{
+    const ScopedLock lock(waveformLock);
+    triggeredWaveformSamples = samples;
+}
+
+void NIDAQOutput::playTriggeredWaveform()
+{
+    Array<float> samples;
+    {
+        const ScopedLock lock(waveformLock);
+        samples = triggeredWaveformSamples;
+    }
+    playWaveformSamples(samples);
+}
+
+int NIDAQOutput::getSelectedTtlTriggerLine() const
+{
+    auto* triggerParam = dynamic_cast<CategoricalParameter*>(getParameter("trigger"));
+    if (triggerParam == nullptr)
+        return -1;
+
+    const String trigger = triggerParam->getSelectedString();
+    if (!trigger.startsWithIgnoreCase("TTL"))
+        return -1;
+
+    const int line = trigger.fromFirstOccurrenceOf("TTL", false, false).getIntValue();
+    return line >= 1 ? line : -1;
+}
+
 void NIDAQOutput::parameterValueChanged(Parameter* parameter)
 {
     if (parameter->getName() == "device")
@@ -505,13 +535,21 @@ void NIDAQOutput::process (AudioBuffer<float>& buffer)
 void NIDAQOutput::handleTTLEvent(TTLEventPtr event)
 {
     const int eventBit = event->getLine() + 1;
-    DataStream* stream = getDataStream(event->getStreamId());
-    int64 firstSampleNumber = getFirstSampleNumberForBlock(event->getStreamId());
 
-    if (mNIDAQ->sendsSynchronizedEvents())
-	    mNIDAQ->addEvent(event->getSampleNumber(), eventBit, event->getState());
-    else
-        mNIDAQ->digitalWrite(eventBit, event->getState());
+    if (mNIDAQ != nullptr)
+    {
+        if (mNIDAQ->sendsSynchronizedEvents())
+            mNIDAQ->addEvent(event->getSampleNumber(), eventBit, event->getState());
+        else
+            mNIDAQ->digitalWrite(eventBit, event->getState());
+    }
+
+    const int triggerLine = getSelectedTtlTriggerLine();
+    if (triggerLine > 0 && eventBit == triggerLine && event->getState())
+    {
+        LOGC("TTL", triggerLine, " trigger received; playing waveform");
+        playTriggeredWaveform();
+    }
 }
 
 // ===== CustomWaveform Implementation =====
