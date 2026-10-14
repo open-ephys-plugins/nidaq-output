@@ -772,7 +772,7 @@ Error:
 
 }
 
-void NIDAQmx::writeAnalogWaveform(const AudioBuffer<float>& buffer)
+void NIDAQmx::writeAnalogWaveform(const AudioBuffer<float>& buffer, int analogOutputChannel)
 {
 	NIDAQ::int32 error = 0;
 	NIDAQ::int32 numSamplesWritten = 0;
@@ -792,18 +792,26 @@ void NIDAQmx::writeAnalogWaveform(const AudioBuffer<float>& buffer)
 	clearAnalogTask();
 	clearDigitalFiniteTask();
 
-	const int numChannels = juce::jmin(buffer.getNumChannels(), (int) device->numAOChannels);
+	const int maxAo = juce::jmax(1, (int) device->numAOChannels);
+	const int firstChannel = juce::jlimit(0, maxAo - 1, analogOutputChannel);
+	const int numChannels = juce::jmin(buffer.getNumChannels(), maxAo - firstChannel);
 	const int numSamples = buffer.getNumSamples();
 	if (numChannels <= 0)
 		return;
 
 	const String digitalLine = getFirstSelectedDigitalLine();
 	setNumActiveAnalogOutputs(numChannels);
+	const int lastChannel = firstChannel + numChannels - 1;
+	const String channelString = (numChannels == 1)
+		? device->getName() + "/ao" + String(firstChannel)
+		: device->getName() + "/ao" + String(firstChannel) + ":" + String(lastChannel);
 	LOGD("NIDAQmx::writeAnalogWaveform configuring finite AO task with sampleRate=", getSampleRate(),
 		 ", bufferChannels=", buffer.getNumChannels(),
 		 ", deviceAOChannels=", device->numAOChannels,
+		 ", firstChannel=", firstChannel,
 		 ", channelsWritten=", numChannels,
 		 ", samplesPerChannel=", numSamples,
+		 ", channelString=", channelString,
 		 ", digitalLine=", digitalLine);
 	HeapBlock<NIDAQ::float64> outputData(numChannels * numSamples);
 
@@ -822,7 +830,7 @@ void NIDAQmx::writeAnalogWaveform(const AudioBuffer<float>& buffer)
 
 	DAQmxErrChk(NIDAQ::DAQmxCreateAOVoltageChan(
 		taskHandleAO,
-		STR2CHR(device->getName() + "/ao0:" + String(numChannels - 1)),
+		STR2CHR(channelString),
 		"", -10.0, 10.0,
 		DAQmx_Val_Volts,
 		nullptr)

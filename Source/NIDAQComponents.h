@@ -345,7 +345,7 @@ public:
 	void requestShutdown();
 
 	void analogWrite(AudioBuffer<float>& buffer, int numSamples);
-	void writeAnalogWaveform(const AudioBuffer<float>& buffer);
+	void writeAnalogWaveform(const AudioBuffer<float>& buffer, int analogOutputChannel = 0);
 	void digitalWrite(int channelIdx, bool state);
 
 	void run() override;

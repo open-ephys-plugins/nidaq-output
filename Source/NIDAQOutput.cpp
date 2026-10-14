@@ -233,12 +233,16 @@ void NIDAQOutput::playWaveformSamples(const Array<float>& samples)
         return;
     }
 
+    int outputChannel = 0;
+    if (auto* outputParam = dynamic_cast<CategoricalParameter*>(getParameter("output")))
+        outputChannel = outputParam->getSelectedIndex();
+
     AudioBuffer<float> buffer(1, samples.size());
     for (int i = 0; i < samples.size(); ++i)
         buffer.setSample(0, i, samples[i]);
 
     outputEnabled = true;
-    mNIDAQ->writeAnalogWaveform(buffer);
+    mNIDAQ->writeAnalogWaveform(buffer, outputChannel);
 }
 
 void NIDAQOutput::parameterValueChanged(Parameter* parameter)
