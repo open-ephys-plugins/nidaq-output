@@ -600,10 +600,7 @@ void NIDAQOutput::handleTTLEvent(TTLEventPtr event)
 
     const int triggerLine = getSelectedTtlTriggerLine();
     if (triggerLine > 0 && eventBit == triggerLine && event->getState())
-    {
-        LOGC("TTL", triggerLine, " trigger received; playing waveform");
         playTriggeredWaveform();
-    }
 }
 
 // ===== CustomWaveform Implementation =====

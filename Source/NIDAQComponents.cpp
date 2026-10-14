@@ -951,12 +951,6 @@ void NIDAQmx::writeAnalogWaveform(const AudioBuffer<float>& buffer, int analogOu
 
 	DAQmxErrChk(NIDAQ::DAQmxStartTask(taskHandleAO));
 
-	LOGC("Started finite analog waveform: channels=", numChannels,
-		 ", samples=", numSamples,
-		 ", sampleRate=", getSampleRate(),
-		 ", duration=", numSamples / getSampleRate(), " seconds",
-		 digitalTaskReady ? ", digitalLine=" + digitalLine : "");
-
 Error:
 
 	if (DAQmxFailed(error))
