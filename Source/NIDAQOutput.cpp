@@ -131,6 +131,9 @@ void NIDAQOutput::registerParameters()
 
     addCategoricalParameter(Parameter::PROCESSOR_SCOPE, "trigger", "Trigger",
         "Trigger source", triggerOptions, 0, true);
+
+    addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "input", "Input",
+        "Continuous channel to mirror", 1);
 }
 
 String NIDAQOutput::handleConfigMessage(const String& message)
@@ -275,6 +278,52 @@ int NIDAQOutput::getSelectedTtlTriggerLine() const
     return line >= 1 ? line : -1;
 }
 
+String NIDAQOutput::getConfigMode() const
+{
+    auto* configParam = dynamic_cast<CategoricalParameter*>(getParameter("config"));
+    return configParam != nullptr ? configParam->getSelectedString() : "Local";
+}
+
+void NIDAQOutput::applyConfigMode(const String& mode)
+{
+    if (mode.equalsIgnoreCase("Mirror"))
+        outputMode = MIRROR_INPUT;
+    else
+        outputMode = CUSTOM_WAVEFORM;
+
+    getParameter("output")->setEnabled(!mode.equalsIgnoreCase("Remote"));
+
+    if (auto* editor = dynamic_cast<NIDAQOutputEditor*>(getEditor()))
+        editor->updateConfigUI();
+}
+
+int NIDAQOutput::getSelectedMirrorInputChannel() const
+{
+    auto* ed = dynamic_cast<GenericEditor*>(getEditor());
+    if (ed == nullptr)
+        return -1;
+
+    const uint16 streamId = ed->getCurrentStream();
+    DataStream* stream = getDataStream(streamId);
+    if (stream == nullptr)
+        return -1;
+
+    auto* inputParam = dynamic_cast<SelectedChannelsParameter*>(stream->getParameter("input"));
+    if (inputParam == nullptr)
+        return -1;
+
+    Array<var>* selected = inputParam->getValue().getArray();
+    if (selected == nullptr || selected->isEmpty())
+        return -1;
+
+    const int localIndex = int(selected->getFirst());
+    const auto& channels = stream->getContinuousChannels();
+    if (localIndex < 0 || localIndex >= channels.size())
+        return -1;
+
+    return channels[localIndex]->getGlobalIndex();
+}
+
 void NIDAQOutput::parameterValueChanged(Parameter* parameter)
 {
     if (parameter->getName() == "device")
@@ -308,8 +357,7 @@ void NIDAQOutput::parameterValueChanged(Parameter* parameter)
     }
     else if (parameter->getName() == "config")
     {
-        const String mode = ((CategoricalParameter*) parameter)->getSelectedString();
-        getParameter("output")->setEnabled(mode != "Remote");
+        applyConfigMode(((CategoricalParameter*) parameter)->getSelectedString());
     }
     else if (parameter->getName() == "trigger")
     {
@@ -318,15 +366,12 @@ void NIDAQOutput::parameterValueChanged(Parameter* parameter)
     }
     else if (parameter->getName() == "outputMode")
     {
+        // Legacy STREAM parameter; Config is the driver. Keep in sync if still used.
         const String mode = parameter->getValue().toString();
         if (mode.equalsIgnoreCase("MIRROR_INPUT") || mode.equalsIgnoreCase("Mirror Input"))
-        {
             outputMode = MIRROR_INPUT;
-        }
         else if (mode.equalsIgnoreCase("CUSTOM_WAVEFORM") || mode.equalsIgnoreCase("Custom Waveform"))
-        {
             outputMode = CUSTOM_WAVEFORM;
-        }
     }
 }
 
@@ -445,7 +490,8 @@ bool NIDAQOutput::startAcquisition()
 {
     LOGD("Starting Tasks...");
 
-    outputEnabled = false;
+    applyConfigMode(getConfigMode());
+    outputEnabled = (outputMode == MIRROR_INPUT);
 
     const int maxAoChannels = juce::jmax(1, (int) mNIDAQ->device->numAOChannels);
     mNIDAQ->setNumActiveAnalogOutputs(maxAoChannels);
@@ -508,8 +554,6 @@ void NIDAQOutput::process (AudioBuffer<float>& buffer)
     /* Check for events */
     checkForEvents();
 
-    outputMode = getOutputMode();
-    
     // Mirror Input follows the incoming audio stream; custom waveforms are generated at the NI AO sample rate.
     double currentSampleRate = AudioProcessor::getSampleRate();
     if (outputMode == MIRROR_INPUT && currentSampleRate != lastSampleRate && currentSampleRate > 0)
@@ -519,11 +563,15 @@ void NIDAQOutput::process (AudioBuffer<float>& buffer)
         LOGC("Sample rate changed to: ", currentSampleRate);
     }
 
-    if (!outputEnabled) return;
-
     if (outputMode == MIRROR_INPUT)
     {
-        mNIDAQ->analogWrite(buffer, buffer.getNumSamples());
+        const int inputChannel = getSelectedMirrorInputChannel();
+        if (inputChannel < 0 || inputChannel >= buffer.getNumChannels() || mNIDAQ == nullptr)
+            return;
+
+        AudioBuffer<float> mirrorBuffer(1, buffer.getNumSamples());
+        mirrorBuffer.copyFrom(0, 0, buffer, inputChannel, 0, buffer.getNumSamples());
+        mNIDAQ->analogWrite(mirrorBuffer, buffer.getNumSamples());
     }
     else if (outputMode == CUSTOM_WAVEFORM)
     {
@@ -543,6 +591,9 @@ void NIDAQOutput::handleTTLEvent(TTLEventPtr event)
         else
             mNIDAQ->digitalWrite(eventBit, event->getState());
     }
+
+    if (!getConfigMode().equalsIgnoreCase("Local"))
+        return;
 
     const int triggerLine = getSelectedTtlTriggerLine();
     if (triggerLine > 0 && eventBit == triggerLine && event->getState())

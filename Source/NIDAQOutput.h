@@ -190,6 +190,9 @@ public:
 private:
     void playTriggeredWaveform();
     int getSelectedTtlTriggerLine() const;
+    String getConfigMode() const;
+    int getSelectedMirrorInputChannel() const;
+    void applyConfigMode(const String& mode);
 
     /* Manages connected NIDAQ devices */
     ScopedPointer<NIDAQmxDeviceManager> dm;

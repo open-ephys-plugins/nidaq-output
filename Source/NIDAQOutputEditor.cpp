@@ -36,8 +36,9 @@ NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
 
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "device", 15, 29);
     addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "config", 15, 54);
-    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "output", 15, 79);
-    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "trigger", 15, 104);
+    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "trigger", 15, 79);
+    addSelectedChannelsParameterEditor(Parameter::STREAM_SCOPE, "input", 15, 79);
+    addComboBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "output", 15, 104);
 
     waveformLabel = std::make_unique<Label>("WaveformLabel", "Waveform:");
     waveformLabel->setFont(Font(13.0f));
@@ -77,7 +78,7 @@ NIDAQOutputEditor::NIDAQOutputEditor(GenericProcessor* parentNode)
     addAndMakeVisible(waveformView.get());
 
     rebuildCurrentPattern();
-    updateTriggerUI();
+    updateConfigUI();
 }
 
 void NIDAQOutputEditor::update(int numAnalog, int numDigital, int digitalWriteSize)
@@ -211,12 +212,31 @@ void NIDAQOutputEditor::rebuildCurrentPattern()
 
 void NIDAQOutputEditor::updateTriggerUI()
 {
-    if (processor == nullptr || waveformView == nullptr)
+    updateConfigUI();
+}
+
+void NIDAQOutputEditor::updateConfigUI()
+{
+    if (processor == nullptr)
         return;
 
-    auto* triggerParam = (CategoricalParameter*) processor->getParameter("trigger");
-    const bool isManual = triggerParam != nullptr && triggerParam->getSelectedString() == "Manual";
-    waveformView->setPlayButtonVisible(isManual);
+    auto* configParam = dynamic_cast<CategoricalParameter*>(processor->getParameter("config"));
+    const String config = configParam != nullptr ? configParam->getSelectedString() : "Local";
+    const bool isLocal = config.equalsIgnoreCase("Local");
+    const bool isMirror = config.equalsIgnoreCase("Mirror");
+
+    if (auto* triggerEditor = getParameterEditor("trigger"))
+        triggerEditor->setVisible(isLocal);
+
+    if (auto* inputEditor = getParameterEditor("input"))
+        inputEditor->setVisible(isMirror);
+
+    if (waveformView != nullptr)
+    {
+        auto* triggerParam = dynamic_cast<CategoricalParameter*>(processor->getParameter("trigger"));
+        const bool isManual = triggerParam != nullptr && triggerParam->getSelectedString() == "Manual";
+        waveformView->setPlayButtonVisible(isLocal && isManual);
+    }
 }
 
 void NIDAQOutputEditor::refreshWaveformView()

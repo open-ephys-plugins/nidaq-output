@@ -111,6 +111,9 @@ public:
     /** Sync Play button visibility with trigger mode */
     void updateTriggerUI();
 
+    /** Sync Trigger / Input / Play visibility with Config mode */
+    void updateConfigUI();
+
     /** Refresh waveform preview / sample rate */
     void refreshWaveformView();
 
