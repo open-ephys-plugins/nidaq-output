@@ -493,8 +493,10 @@ bool NIDAQOutput::startAcquisition()
     applyConfigMode(getConfigMode());
     outputEnabled = (outputMode == MIRROR_INPUT);
 
-    const int maxAoChannels = juce::jmax(1, (int) mNIDAQ->device->numAOChannels);
-    mNIDAQ->setNumActiveAnalogOutputs(maxAoChannels);
+    if (outputMode == MIRROR_INPUT)
+        mNIDAQ->setNumActiveAnalogOutputs(1);
+    else
+        mNIDAQ->setNumActiveAnalogOutputs(juce::jmax(1, (int) mNIDAQ->device->numAOChannels));
     
     lastSampleRate = mNIDAQ->getSampleRate();
     mNIDAQ->setAudioSampleRate(AudioProcessor::getSampleRate());
@@ -571,6 +573,7 @@ void NIDAQOutput::process (AudioBuffer<float>& buffer)
 
         AudioBuffer<float> mirrorBuffer(1, buffer.getNumSamples());
         mirrorBuffer.copyFrom(0, 0, buffer, inputChannel, 0, buffer.getNumSamples());
+        mirrorBuffer.applyGain(0.01f); // scale input (~uV) into AO voltage range
         mNIDAQ->analogWrite(mirrorBuffer, buffer.getNumSamples());
     }
     else if (outputMode == CUSTOM_WAVEFORM)

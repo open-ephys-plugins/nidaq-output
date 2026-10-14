@@ -735,29 +735,32 @@ void NIDAQmx::analogWrite(AudioBuffer<float>& buffer, int numSamples)
     NIDAQ::float64 timeout = 10.0;
     char errBuff[2048] = { '\0' };
 
-	const int numChannels = buffer.getNumChannels();
+	if (audioSampleRate <= 0 || numSamples <= 0 || buffer.getNumChannels() < 1)
+		return;
 
-	samplesPerChannel = (numSamples/(audioSampleRate/10000.0/2.0));
-	const int actualSamplesPerChannel = samplesPerChannel * 2;
+	const int numChannels = 1;
 
-	HeapBlock<NIDAQ::float64> outputData(numChannels * actualSamplesPerChannel);
-
-	// DAQmx_Val_GroupByChannel: all samples for ch0, then all samples for ch1
-	for (int ch = 0; ch < numChannels; ++ch)
+	samplesPerChannel = (NIDAQ::uInt64)(numSamples / (audioSampleRate / 10000.0 / 2.0));
+	int writeSamples = (int)(samplesPerChannel * 2);
+	if (writeSamples > numSamples)
 	{
-		const float* channelData = buffer.getReadPointer(ch);
-		for (int sample = 0; sample < actualSamplesPerChannel; ++sample)
-		{
-			float inSample = sample < numSamples ? channelData[sample] : 0.0f;
-			outputData[ch * actualSamplesPerChannel + sample] = static_cast<NIDAQ::float64>(inSample);
-		}
+		writeSamples = numSamples;
+		samplesPerChannel = (NIDAQ::uInt64)(writeSamples / 2);
 	}
+	if (writeSamples <= 0 || samplesPerChannel == 0)
+		return;
 
-	analogOutBuffer->write(outputData, numChannels * actualSamplesPerChannel);
+	HeapBlock<NIDAQ::float64> outputData(numChannels * writeSamples);
+
+	const float* channelData = buffer.getReadPointer(0);
+	for (int sample = 0; sample < writeSamples; ++sample)
+		outputData[sample] = static_cast<NIDAQ::float64>(channelData[sample]);
+
+	analogOutBuffer->write(outputData, numChannels * writeSamples);
 
 	writeCount++;
 
-	if (!isThreadRunning()) startThread();
+	if (!isThreadRunning() && writeCount > 2) startThread();
 
 Error:
 
@@ -986,23 +989,20 @@ void NIDAQmx::run()
 
 	while (!threadShouldExit())
 	{
-		// Read numChannels dynamically in case it changed
 		const int numChannels = numActiveAnalogOutputs;
-		
+
 		if (samplesPerChannel == 0)
 		{
-			// Wait for samplesPerChannel to be set
 			Thread::sleep(1);
 			continue;
 		}
-		
-		// Allocate buffer: analogWrite writes numChannels * (samplesPerChannel*2)
-		const int actualSamplesPerChannel = samplesPerChannel * 2;
-		HeapBlock<NIDAQ::float64> analogData(numChannels * actualSamplesPerChannel);
-		analogOutBuffer->read(analogData, numChannels * actualSamplesPerChannel);
+
+		// analogWrite produces 2*samplesPerChannel; consume half-chunks for headroom
+		HeapBlock<NIDAQ::float64> analogData(numChannels * samplesPerChannel);
+		analogOutBuffer->read(analogData, numChannels * samplesPerChannel);
 
 		DAQmxErrChk(NIDAQ::DAQmxWriteAnalogF64(taskHandleAO,
-			actualSamplesPerChannel,
+			samplesPerChannel,
 			0,
 			timeout,
 			DAQmx_Val_GroupByChannel,
